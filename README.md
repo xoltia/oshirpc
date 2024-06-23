@@ -10,6 +10,6 @@ currently watching on YouTube. Made to work with Firefox on Linux.
 1. Install the extension.
 2. Build and install the native application (ex. `go install github.com/xoltia/oshirpc`).
 3. Install the native manifest. Change the `path` field in `native_manifest.json` to the install path of
-   the native application (`$GOBIN` or `$HOME/go/bin` by default if installed as shown above). Next, move
+   the native application (`$GOBIN/oshirpc` or `$HOME/go/bin/oshirpc` by default if installed as shown above). Next, move
    the `native_manifest.json` to the config directory (ex. `cp native_manifest.json ~/com.github.xoltia.oshirpc.json`).
    
