@@ -11,5 +11,8 @@ currently watching on YouTube. Made to work with Firefox on Linux.
 2. Build and install the native application (ex. `go install github.com/xoltia/oshirpc`).
 3. Install the native manifest. Change the `path` field in `native_manifest.json` to the install path of
    the native application (`$GOBIN/oshirpc` or `$HOME/go/bin/oshirpc` by default if installed as shown above). Next, move
-   the `native_manifest.json` to the config directory (ex. `cp native_manifest.json ~/com.github.xoltia.oshirpc.json`).
-   
+   the `native_manifest.json` to the config directory (ex. `cp native_manifest.json ~/.mozilla/com.github.xoltia.oshirpc.json`).
+
+## Credit
+- Extension code based on [YouTubeDiscordPresence](https://github.com/XFG16/YouTubeDiscordPresence).
+- Data from [Hololist](https://hololist.net) using [vtuber-database](https://github.com/xoltia/oshirpc/vtuber-database).
