@@ -52,6 +52,7 @@ func getLogFileName() (string, error) {
 }
 
 type vtuber struct {
+	URL              string `json:"url"`
 	Name             string `json:"name"`
 	Affiliation      string `json:"affiliation"`
 	Image            string `json:"image"`
@@ -140,8 +141,20 @@ func (t *tracker) updatePresence(msg message) {
 				Label: "Watch on YouTube",
 				Url:   fmt.Sprintf("https://www.youtube.com/watch?v=%s", msg.VideoID),
 			},
+			{
+				Label: "VTuber Info",
+				Url:   vtuber.URL,
+			},
+		},
+		Timestamps: &client.Timestamps{
+			Start: new(time.Time),
+			End:   new(time.Time),
 		},
 	}
+
+	*a.Timestamps.Start = time.Now()
+	*a.Timestamps.End = time.Now().Add(time.Duration(msg.TimeLeft) * time.Second)
+	slog.Debug("Setting end time", slog.Time("end", *a.Timestamps.End))
 
 	if agencyIconExists {
 		a.SmallImage = agencyIcon
