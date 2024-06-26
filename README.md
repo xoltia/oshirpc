@@ -15,4 +15,4 @@ currently watching on YouTube. Made to work with Firefox on Linux.
 
 ## Credit
 - Extension code based on [YouTubeDiscordPresence](https://github.com/XFG16/YouTubeDiscordPresence).
-- Data from [Hololist](https://hololist.net) using [vtuber-database](https://github.com/xoltia/vtuber-database).
+- Data from [Hololist](https://hololist.net) and can be found here [vtuber-database](https://github.com/xoltia/vtuber-database).
