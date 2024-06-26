@@ -96,15 +96,19 @@ func init() {
 }
 
 type tracker struct {
-	activity      chan message
-	lastVideo     string
-	loggedIn      bool
-	timeRemaining float64
+	activity chan message
+	loggedIn bool
+	// Amount of time to wait before clearing the presence if no activity is received.
+	idleTime time.Duration
+	// Acceptable drift in time before updating the presence.
+	drift time.Duration
 }
 
 func newTracker() *tracker {
 	return &tracker{
 		activity: make(chan message),
+		idleTime: time.Second * 2,
+		drift:    time.Millisecond * 1500,
 	}
 }
 
@@ -169,31 +173,41 @@ func (t *tracker) updatePresence(msg message) {
 		slog.Error("Failed to set activity", slog.String("error", err.Error()))
 		return
 	}
-
-	t.lastVideo = msg.VideoID
-	t.timeRemaining = msg.TimeLeft
 }
 
 func (t *tracker) clearPresence() {
 	client.Logout()
-	t.lastVideo = ""
-	t.timeRemaining = 0
 	t.loggedIn = false
 }
 
 func (t *tracker) run() {
+	ticker := time.NewTicker(t.idleTime)
+	defer ticker.Stop()
+
+	lastVideo := ""
+	lastTimeLeft := time.Duration(0)
+
 	for {
 		select {
 		case msg := <-t.activity:
-			if msg.VideoID != t.lastVideo {
+			timeLeft := time.Duration(msg.TimeLeft * float64(time.Second))
+
+			if msg.VideoID != lastVideo {
 				t.updatePresence(msg)
-			} else if t.timeRemaining-msg.TimeLeft > 1.5 {
-				t.updatePresence(msg)
-			} else {
-				t.timeRemaining = msg.TimeLeft
+				lastVideo = msg.VideoID
+				lastTimeLeft = timeLeft
+				continue
 			}
-		case <-time.After(2 * time.Second):
+
+			ticker.Reset(t.idleTime)
+			if lastTimeLeft-timeLeft > t.drift {
+				t.updatePresence(msg)
+			}
+			lastTimeLeft = timeLeft
+		case <-ticker.C:
 			t.clearPresence()
+			lastVideo = ""
+			lastTimeLeft = 0
 		}
 	}
 }
