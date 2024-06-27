@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -10,7 +11,7 @@ import (
 	"github.com/adrg/xdg"
 )
 
-func initLogger() {
+func initLogger() io.Closer {
 	logFileName, err := xdg.StateFile("oshirpc/log.jsonl")
 	if err != nil {
 		panic(err)
@@ -20,18 +21,20 @@ func initLogger() {
 	if err != nil {
 		panic(err)
 	}
-	defer logFile.Close()
 
 	slog.SetDefault(
 		slog.New(slog.NewJSONHandler(logFile, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		})),
 	)
+
+	return logFile
 }
 
 func main() {
 	loadData()
-	initLogger()
+	logOutput := initLogger()
+	defer logOutput.Close()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	closed := make(chan struct{})
