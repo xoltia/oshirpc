@@ -14,27 +14,31 @@ import (
 const clientID = "505848729119621140"
 
 type tracker struct {
-	activity chan message
-	loggedIn bool
-	// Amount of time to wait before clearing the presence if no activity is received.
-	idleTime time.Duration
-	// Acceptable drift in time before updating the presence.
-	drift time.Duration
+	activity      chan message
+	lastVideo     string
+	loggedIn      bool
+	timeRemaining float64
+	lastUpdate    time.Time
 }
 
 func newTracker() *tracker {
 	return &tracker{
 		activity: make(chan message),
-		idleTime: time.Second * 2,
-		drift:    time.Millisecond * 1500,
 	}
 }
 
+func handleFromURL(url string) string {
+	return path.Base(url)
+}
+
 func (t *tracker) updatePresence(msg message) {
-	handle := path.Base(msg.ChannelURL)
+	handle := handleFromURL(msg.ChannelURL)
 	vtuber, ok := findVtuber(strings.ToLower(handle))
 	if !ok {
 		slog.Debug("Vtuber not found", slog.String("channelURL", msg.ChannelURL), slog.String("handle", handle))
+		if t.loggedIn && time.Since(t.lastUpdate) > 2*time.Second {
+			t.clearPresence()
+		}
 		return
 	}
 
@@ -87,41 +91,32 @@ func (t *tracker) updatePresence(msg message) {
 		slog.Error("Failed to set activity", slog.String("error", err.Error()))
 		return
 	}
+
+	t.lastVideo = msg.VideoID
+	t.timeRemaining = msg.TimeLeft
+	t.lastUpdate = time.Now()
 }
 
 func (t *tracker) clearPresence() {
 	client.Logout()
+	t.lastVideo = ""
+	t.timeRemaining = 0
 	t.loggedIn = false
 }
 
 func (t *tracker) run(ctx context.Context) {
-	ticker := time.NewTicker(t.idleTime)
-	defer ticker.Stop()
-
-	lastVideo := ""
-	lastTimeLeft := time.Duration(0)
-
 	for {
 		select {
 		case msg := <-t.activity:
-			timeLeft := time.Duration(msg.TimeLeft * float64(time.Second))
-
-			if msg.VideoID != lastVideo {
+			if msg.VideoID != t.lastVideo {
 				t.updatePresence(msg)
-				lastVideo = msg.VideoID
-				lastTimeLeft = timeLeft
-				continue
-			}
-
-			ticker.Reset(t.idleTime)
-			if lastTimeLeft-timeLeft > t.drift {
+			} else if t.timeRemaining-msg.TimeLeft > 1.5 {
 				t.updatePresence(msg)
+			} else {
+				t.timeRemaining = msg.TimeLeft
 			}
-			lastTimeLeft = timeLeft
-		case <-ticker.C:
+		case <-time.After(2 * time.Second):
 			t.clearPresence()
-			lastVideo = ""
-			lastTimeLeft = 0
 		case <-ctx.Done():
 			t.clearPresence()
 			return
