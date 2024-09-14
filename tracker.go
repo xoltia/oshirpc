@@ -33,16 +33,56 @@ func handleFromURL(url string) string {
 
 func (t *tracker) updatePresence(msg message) {
 	handle := handleFromURL(msg.ChannelURL)
-	vtuber, ok := findVtuber(strings.ToLower(handle))
-	if !ok {
+
+	var activity client.Activity
+
+	if agencyChannel, ok := agencyChannels[handle]; ok {
+		agencyIcon := agencyIcons[agencyChannel]
+		activity = client.Activity{
+			Details:    msg.VideoTitle,
+			State:      fmt.Sprintf("Watching %s", agencyChannel),
+			LargeImage: agencyIcon,
+			LargeText:  handle,
+			Timestamps: &client.Timestamps{
+				Start: new(time.Time),
+				End:   new(time.Time),
+			},
+		}
+	} else if vtuber, ok := findVtuber(strings.ToLower(handle)); ok {
+		activity = client.Activity{
+			Details:    msg.VideoTitle,
+			State:      fmt.Sprintf("Watching %s", vtuber.Name),
+			LargeImage: vtuber.YoutubeThumbnail,
+			LargeText:  handle,
+			Buttons: []*client.Button{
+				{
+					Label: "Watch on YouTube",
+					Url:   fmt.Sprintf("https://www.youtube.com/watch?v=%s", msg.VideoID),
+				},
+				{
+					Label: "VTuber Info",
+					Url:   vtuber.URL,
+				},
+			},
+			Timestamps: &client.Timestamps{
+				Start: new(time.Time),
+				End:   new(time.Time),
+			},
+		}
+
+		agencyIcon, agencyIconExists := agencyIcons[vtuber.Affiliation]
+
+		if agencyIconExists {
+			activity.SmallImage = agencyIcon
+			activity.SmallText = vtuber.Affiliation
+		}
+	} else {
 		slog.Debug("Vtuber not found", slog.String("channelURL", msg.ChannelURL), slog.String("handle", handle))
 		if t.loggedIn && time.Since(t.lastUpdate) > 2*time.Second {
 			t.clearPresence()
 		}
 		return
 	}
-
-	agencyIcon, agencyIconExists := agencyIcons[vtuber.Affiliation]
 
 	if !t.loggedIn {
 		err := client.Login(clientID)
@@ -53,39 +93,12 @@ func (t *tracker) updatePresence(msg message) {
 		t.loggedIn = true
 	}
 
-	a := client.Activity{
-		Details:    msg.VideoTitle,
-		State:      fmt.Sprintf("Watching %s", vtuber.Name),
-		LargeImage: vtuber.YoutubeThumbnail,
-		LargeText:  handle,
-		Buttons: []*client.Button{
-			{
-				Label: "Watch on YouTube",
-				Url:   fmt.Sprintf("https://www.youtube.com/watch?v=%s", msg.VideoID),
-			},
-			{
-				Label: "VTuber Info",
-				Url:   vtuber.URL,
-			},
-		},
-		Timestamps: &client.Timestamps{
-			Start: new(time.Time),
-			End:   new(time.Time),
-		},
-	}
+	*activity.Timestamps.Start = time.Now()
+	*activity.Timestamps.End = time.Now().Add(time.Duration(msg.TimeLeft) * time.Second)
+	slog.Debug("Setting end time", slog.Time("end", *activity.Timestamps.End))
 
-	*a.Timestamps.Start = time.Now()
-	*a.Timestamps.End = time.Now().Add(time.Duration(msg.TimeLeft) * time.Second)
-	slog.Debug("Setting end time", slog.Time("end", *a.Timestamps.End))
-
-	if agencyIconExists {
-		a.SmallImage = agencyIcon
-		a.SmallText = vtuber.Affiliation
-	}
-
-	slog.Debug("Setting activity", slog.Any("activity", a))
-
-	err := client.SetActivity(a)
+	slog.Debug("Setting activity", slog.Any("activity", activity))
+	err := client.SetActivity(activity)
 
 	if err != nil {
 		slog.Error("Failed to set activity", slog.String("error", err.Error()))

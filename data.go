@@ -20,9 +20,13 @@ var vtubersJSON []byte
 //go:embed agency_icons.json
 var agencyIconsJSON []byte
 
+//go:embed agency_channels.json
+var agencyChannelsJSON []byte
+
 var (
-	vtubers     []vtuber
-	agencyIcons map[string]string
+	vtubers        []vtuber
+	agencyIcons    map[string]string
+	agencyChannels map[string]string
 )
 
 func findVtuber(channelHandle string) (vtuber, bool) {
@@ -46,6 +50,11 @@ func loadEmbeddedData() {
 	}
 
 	err = json.Unmarshal(agencyIconsJSON, &agencyIcons)
+	if err != nil {
+		panic(err)
+	}
+
+	err = json.Unmarshal(agencyChannelsJSON, &agencyChannels)
 	if err != nil {
 		panic(err)
 	}
