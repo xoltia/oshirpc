@@ -7,8 +7,12 @@
     "icons": {},
     "content_scripts": [
         {
-            "matches": ["https://www.youtube.com/*"],
-            "js": ["content_loader.js"]
+            "matches": [
+                "https://www.youtube.com/*"
+            ],
+            "js": [
+                "content_loader.js"
+            ]
         }
     ],
     "browser_specific_settings": {
@@ -21,11 +25,17 @@
             "resources": [
                 "content.js"
             ],
-            "matches": ["https://www.youtube.com/*"]
+            "matches": [
+                "https://www.youtube.com/*"
+            ]
         }
     ],
     "background": {
-        "scripts": ["background.js"]
+        "scripts": [
+            "background.js"
+        ]
     },
-    "permissions": ["nativeMessaging"]
+    "permissions": [
+        "nativeMessaging"
+    ]
 }
