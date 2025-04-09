@@ -64,7 +64,7 @@ export class RichPresenceProxy {
 
     constructor(
         public clientId: string,
-        public nativeApplication: string = "DiscordRichPresenceProxy",
+        public nativeApplication: string = "com.github.xoltia.oshirpc",
     ) {
         this.port = null;
     }
