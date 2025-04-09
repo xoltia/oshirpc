@@ -12,6 +12,6 @@
     "@types/firefox-webext-browser": "^120.0.4"
   },
   "scripts": {
-    "build": "bun build --outdir=dist --target=browser --format=esm content.ts background.ts contentLoader.ts"
+    "build": "bun build --outdir=dist --target=browser --format=esm content.ts background.ts contentLoader.ts && cp manifest.json dist/manifest.json"
   }
 }

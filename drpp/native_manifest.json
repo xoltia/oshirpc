@@ -1,0 +1,9 @@
+{
+    "name": "com.github.xoltia.oshirpc",
+    "description": "OshiRPC native application",
+    "path": "{REPLACE_ME_WITH_PATH_TO_NATIVE_APP}",
+    "type": "stdio",
+    "allowed_extensions": [
+        "oshirpc@xoltia.github.io"
+    ]
+}
