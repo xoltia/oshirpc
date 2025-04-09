@@ -1,6 +1,6 @@
 import { RichPresenceProxy, ActivityType } from "./drpc";
 
-const CLIENT_ID = "1051101012024";
+const CLIENT_ID = "";
 
 let presence: RichPresenceProxy | null = null;
 
