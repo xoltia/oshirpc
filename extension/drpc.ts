@@ -42,10 +42,10 @@ export type Button = {
 };
 
 export type Activity = {
-    name: string;
+    // name: string;
     type: ActivityType;
     url?: string;
-    created_at: number;
+    // created_at: number;
     timestamps?: Timestamp;
     application_id?: string;
     details?: string;
@@ -87,7 +87,7 @@ export class RichPresenceProxy {
         this.port = null;
     }
 
-    public setActivity(activity: Activity): void {
+    public setActivity(activity: Activity | null): void {
         if (!this.port) throw new Error("Not connected to Discord Rich Presence");
         this.port.postMessage(activity);
     }
