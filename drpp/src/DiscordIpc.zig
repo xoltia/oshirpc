@@ -2,49 +2,55 @@ const std = @import("std");
 const builtin = @import("builtin");
 const native_endian = builtin.cpu.arch.endian();
 
-const PathBuffer = [std.fs.max_path_bytes]u8;
+// Max size to accept from Discord. Errors if larger value recieved.
+const MAX_RECV = 1 << 26;
 const Self = @This();
 
 pipe: std.net.Stream,
+allocator: std.mem.Allocator,
 
-pub fn open(client_id: []const u8) !Self {
-    var buffer: PathBuffer = undefined;
-    const len = try LinuxPaths.tempDir(&buffer);
-
-    var path_iterator = LinuxPaths.init(buffer[0..len]);
+pub fn open(allocator: std.mem.Allocator, client_id: []const u8) !Self {
+    var path_iterator = try LinuxPath.init();
     var ipc: Self = undefined;
     while (try path_iterator.next()) |path| {
         if (std.net.connectUnixSocket(path)) |stream| {
-            ipc = .{ .pipe = stream };
+            ipc = .{ .pipe = stream, .allocator = allocator };
             break;
         } else |err| {
             std.log.warn("Unable to open {s}: {?}", .{ path, err });
         }
-    } else return error.Unavailable;
-
-    try ipc.handshake(&buffer, client_id);
+    } else return error.PipeUnavailable;
+    errdefer ipc.close();
+    try ipc.handshake(client_id);
     return ipc;
 }
 
-fn handshake(self: Self, buffer: []u8, client_id: []const u8) !void {
-    var fba = std.heap.FixedBufferAllocator.init(buffer);
-    const allocator = fba.allocator();
+pub fn close(self: Self) void {
+    self.pipe.close();
+}
 
-    const data = try std.json.stringifyAlloc(allocator, .{ .v = 1, .client_id = client_id }, .{});
+fn handshake(self: Self, client_id: []const u8) !void {
+    const data = try std.json.stringifyAlloc(self.allocator, .{ .v = 1, .client_id = client_id }, .{});
     try self.writeMessage(0, data);
-    fba.reset();
+    defer self.allocator.free(data);
 
     const HandshakeResponse = struct {
         code: ?usize = null,
         message: []const u8 = "<no message>",
     };
-    const response_size = try self.readMessage(buffer);
-    const response_data = buffer[0..response_size];
+
+    const response_data = try self.readMessage();
     std.log.debug("Handshake response: {s}", .{response_data});
-    fba.end_index = response_size;
-    const response = try std.json.parseFromSliceLeaky(HandshakeResponse, allocator, response_data, .{ .ignore_unknown_fields = true });
-    if (response.code) |code| {
-        std.log.err("Handshake error: {s} ({d})", .{ response.message, code });
+    const response = try std.json.parseFromSlice(
+        HandshakeResponse,
+        self.allocator,
+        response_data,
+        .{ .ignore_unknown_fields = true },
+    );
+    defer response.deinit();
+
+    if (response.value.code) |code| {
+        std.log.err("Handshake error: {s} ({d})", .{ response.value.message, code });
         return error.FailedHandshake;
     }
 }
@@ -58,7 +64,8 @@ pub fn writeActivityMessage(self: Self, payload: []const u8) !void {
     const timestamp = @as(u64, @bitCast(std.time.milliTimestamp()));
     const nonce = std.fmt.hex(timestamp);
 
-    var buffer = try std.BoundedArray(u8, 4096).init(0);
+    var buffer = std.ArrayList(u8).init(self.allocator);
+    defer buffer.deinit();
     var writer = std.json.writeStream(buffer.writer().any(), .{});
 
     try writer.beginObject();
@@ -80,10 +87,11 @@ pub fn writeActivityMessage(self: Self, payload: []const u8) !void {
         try writer.endObject();
     }
     try writer.endObject();
-    try self.writeMessage(1, buffer.constSlice());
+    try self.writeMessage(1, buffer.items);
 
-    const len = try self.readMessage(&buffer.buffer);
-    std.log.debug("{s}", .{buffer.buffer[0..len]});
+    const response_data = try self.readMessage();
+    defer self.allocator.free(response_data);
+    std.log.debug("Discord: {s}", .{response_data});
 }
 
 fn writeMessage(self: Self, opcode: u32, data: []const u8) !void {
@@ -93,31 +101,35 @@ fn writeMessage(self: Self, opcode: u32, data: []const u8) !void {
     try writer.writeAll(data);
 }
 
-fn readMessage(self: Self, buffer: []u8) !usize {
+fn readMessage(self: Self) ![]u8 {
     const reader = self.pipe.reader();
     _ = try reader.readInt(u32, native_endian);
     const size = try reader.readInt(u32, native_endian);
-    if (size > buffer.len)
+    if (size > MAX_RECV)
         return error.MessageTooLarge;
+    const buffer = try self.allocator.alloc(u8, size);
+    errdefer self.allocator.free(buffer);
     var n: usize = 0;
     while (n < size) {
         n += try reader.read(buffer[n..size]);
     }
-    return n;
+
+    return buffer;
 }
 
-pub const LinuxPaths = struct {
-    path_buffer: PathBuffer,
+// Implementation for listing all possible IPC paths on Linux.
+pub const LinuxPath = struct {
+    path_buffer: [std.fs.max_path_bytes]u8,
     temp_dir_len: usize,
     index: usize,
 
-    fn init(temp_dir: []const u8) LinuxPaths {
-        var iterator = LinuxPaths{
+    fn init() !LinuxPath {
+        var iterator = LinuxPath{
             .path_buffer = undefined,
-            .temp_dir_len = temp_dir.len,
+            .temp_dir_len = 0,
             .index = 0,
         };
-        @memcpy(iterator.path_buffer[0..temp_dir.len], temp_dir);
+        iterator.temp_dir_len = try LinuxPath.tempDir(&iterator.path_buffer);
         return iterator;
     }
 
@@ -128,7 +140,7 @@ pub const LinuxPaths = struct {
         "app/com.discordapp.DiscordCanary",
     };
 
-    fn next(self: *LinuxPaths) !?[]const u8 {
+    fn next(self: *LinuxPath) !?[]const u8 {
         if (self.index == ipc_dirs.len * 10)
             return null;
 
@@ -144,7 +156,7 @@ pub const LinuxPaths = struct {
         return self.path_buffer[0 .. self.temp_dir_len + subpath.len];
     }
 
-    fn tempDir(buffer: *PathBuffer) !usize {
+    fn tempDir(buffer: []u8) !usize {
         var fba = std.heap.FixedBufferAllocator.init(buffer);
         const allocator = fba.allocator();
         if (std.process.getEnvVarOwned(allocator, "XDG_RUNTIME_DIR")) |v| {

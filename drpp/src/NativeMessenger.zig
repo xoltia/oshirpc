@@ -18,14 +18,14 @@ pub fn write(self: Self, message: []const u8) !void {
     try writer.writeAll(message);
 }
 
-pub fn read(self: Self, buffer: []u8) !usize {
+pub fn read(self: Self, allocator: std.mem.Allocator) ![]u8 {
     const reader = self.stdin.reader();
     const size = try reader.readInt(u32, native_endian);
-    if (size > buffer.len)
-        return error.NativeMessageTooLarge;
+    const buffer = try allocator.alloc(u8, size);
+    errdefer allocator.free(buffer);
     var n: usize = 0;
     while (n < size) {
         n += try reader.read(buffer[n..size]);
     }
-    return n;
+    return buffer;
 }
