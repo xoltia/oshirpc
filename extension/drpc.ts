@@ -73,20 +73,22 @@ export class RichPresenceProxy {
         if (this.connected)
             return;
         this.port = browser.runtime.connectNative(this.nativeApplication);
-        this.port.postMessage(Number(this.clientId));
-        this.port.onDisconnect.addListener(this.onDisconnect);
+        this.port.postMessage(this.clientId);
+        this.port.onDisconnect.addListener(this.onDisconnect.bind(this));
     }
 
     public get connected(): boolean {
         return this.port !== null;
     }
 
-    private onDisconnect(_: browser.runtime.Port): void {
+    private onDisconnect(port: browser.runtime.Port): void {
+        if (port.error)
+            console.error("Disconnected from Discord Rich Presence:", port.error);
         this.port = null;
     }
 
     public setActivity(activity: Activity): void {
-        if (!this.port) return;
+        if (!this.port) throw new Error("Not connected to Discord Rich Presence");
         this.port.postMessage(activity);
     }
 };

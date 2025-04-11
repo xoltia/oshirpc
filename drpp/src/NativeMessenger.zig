@@ -25,7 +25,7 @@ pub fn read(self: Self, buffer: []u8) !usize {
         return error.NativeMessageTooLarge;
     var n: usize = 0;
     while (n < size) {
-        n += try reader.read(buffer[n..]);
+        n += try reader.read(buffer[n..size]);
     }
     return n;
 }

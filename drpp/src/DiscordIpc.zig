@@ -5,7 +5,7 @@ const native_endian = builtin.cpu.arch.endian();
 const PathBuffer = [std.fs.max_path_bytes]u8;
 const Self = @This();
 
-pipe: std.fs.File,
+pipe: std.net.Stream,
 
 pub fn open(client_id: []const u8) !Self {
     var buffer: PathBuffer = undefined;
@@ -14,10 +14,12 @@ pub fn open(client_id: []const u8) !Self {
     var path_iterator = LinuxPaths.init(buffer[0..len]);
     var ipc: Self = undefined;
     while (try path_iterator.next()) |path| {
-        if (std.fs.openFileAbsolute(path, .{ .mode = .read_write })) |file| {
-            ipc = .{ .pipe = file };
+        if (std.net.connectUnixSocket(path)) |stream| {
+            ipc = .{ .pipe = stream };
             break;
-        } else |_| {}
+        } else |err| {
+            std.log.warn("Unable to open {s}: {?}", .{ path, err });
+        }
     } else return error.Unavailable;
 
     try ipc.handshake(&buffer, client_id);
@@ -33,15 +35,16 @@ fn handshake(self: Self, buffer: []u8, client_id: []const u8) !void {
     fba.reset();
 
     const HandshakeResponse = struct {
-        code: ?usize,
-        message: []const u8,
+        code: ?usize = null,
+        message: []const u8 = "<no message>",
     };
     const response_size = try self.readMessage(buffer);
     const response_data = buffer[0..response_size];
+    std.log.debug("Handshake response: {s}", .{response_data});
     fba.end_index = response_size;
-    const response = try std.json.parseFromSliceLeaky(HandshakeResponse, allocator, response_data, .{});
+    const response = try std.json.parseFromSliceLeaky(HandshakeResponse, allocator, response_data, .{ .ignore_unknown_fields = true });
     if (response.code) |code| {
-        std.log.err("handshake: {s} ({d})", .{ response.message, code });
+        std.log.err("Handshake error: {s} ({d})", .{ response.message, code });
         return error.FailedHandshake;
     }
 }
@@ -52,12 +55,18 @@ pub fn writeActivityMessage(self: Self, payload: []const u8) !void {
         .windows => std.os.windows.GetCurrentProcessId(),
         else => std.c.getpid(),
     };
+    const timestamp = @as(u64, @bitCast(std.time.milliTimestamp()));
+    const nonce = std.fmt.hex(timestamp);
+
     var buffer = try std.BoundedArray(u8, 4096).init(0);
     var writer = std.json.writeStream(buffer.writer().any(), .{});
+
     try writer.beginObject();
     {
         try writer.objectField("cmd");
         try writer.write("SET_ACTIVITY");
+        try writer.objectField("nonce");
+        try writer.write(nonce);
         try writer.objectField("args");
         try writer.beginObject();
         {
@@ -65,13 +74,16 @@ pub fn writeActivityMessage(self: Self, payload: []const u8) !void {
             try writer.write(pid);
             try writer.objectField("activity");
             try writer.beginWriteRaw();
-            try writer.write(payload);
+            try writer.stream.writeAll(payload);
             writer.endWriteRaw();
         }
         try writer.endObject();
     }
     try writer.endObject();
     try self.writeMessage(1, buffer.constSlice());
+
+    const len = try self.readMessage(&buffer.buffer);
+    std.log.debug("{s}", .{buffer.buffer[0..len]});
 }
 
 fn writeMessage(self: Self, opcode: u32, data: []const u8) !void {
@@ -83,12 +95,13 @@ fn writeMessage(self: Self, opcode: u32, data: []const u8) !void {
 
 fn readMessage(self: Self, buffer: []u8) !usize {
     const reader = self.pipe.reader();
+    _ = try reader.readInt(u32, native_endian);
     const size = try reader.readInt(u32, native_endian);
     if (size > buffer.len)
         return error.MessageTooLarge;
     var n: usize = 0;
     while (n < size) {
-        n += try reader.read(buffer[n..]);
+        n += try reader.read(buffer[n..size]);
     }
     return n;
 }
@@ -123,7 +136,7 @@ pub const LinuxPaths = struct {
         const socket_index = self.index % 10;
         const subpath = try std.fmt.bufPrint(
             self.path_buffer[self.temp_dir_len..],
-            "{s}/discord-ipc-{d}",
+            "/{s}/discord-ipc-{d}",
             .{ ipc_dirs[subdir_index], socket_index },
         );
 
