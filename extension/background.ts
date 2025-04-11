@@ -43,7 +43,6 @@ browser.runtime.onMessage.addListener((message) => {
 
     currentVideoId = message.videoId;
 
-
     if (message.messageType === "UPDATE_PRESENCE_DATA") {
         console.log("Updating presence with data:", message);
         updatePresence({
