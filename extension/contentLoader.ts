@@ -1,10 +1,6 @@
 window.addEventListener("SendToLoader", function (message: any) {
     console.debug(message);
-
-    browser.runtime.sendMessage({
-        messageType: "UPDATE_PRESENCE_DATA",
-        ...message.detail,
-    });
+    browser.runtime.sendMessage((message as CustomEvent).detail);
 }, false);
 
 const mainScript = document.createElement("script");

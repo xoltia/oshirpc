@@ -34,7 +34,7 @@ const NO_MINIPLAYER_ATTRIBUTE = "display: none;";
 const YES_MINIPLAYER_ATRRIBUTE = "";
 
 
-type DocumentData = {
+export type DocumentData = {
     title: string | null;
     author: string | null;
     channelUrl: string | null;

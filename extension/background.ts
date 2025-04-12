@@ -1,4 +1,5 @@
 import { RichPresenceProxy, ActivityType, type Activity } from "./drpc";
+import type { DocumentData } from "./content";
 
 const CLIENT_ID = "505848729119621140";
 
@@ -26,7 +27,7 @@ function clearPresence() {
     }
 }
 
-browser.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message: DocumentData) => {
     console.log("Received message:", message);
 
     // Reset timeout
@@ -42,11 +43,8 @@ browser.runtime.onMessage.addListener((message) => {
     }
 
     currentVideoId = message.videoId;
-
-    if (message.messageType === "UPDATE_PRESENCE_DATA") {
-        console.log("Updating presence with data:", message);
-        updatePresence({
-            type: ActivityType.WATCHING,
-        });
-    }
+    console.log("Updating presence with data:", message);
+    updatePresence({
+        type: ActivityType.WATCHING,
+    });
 });
