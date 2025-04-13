@@ -13,6 +13,7 @@ type VTuber = {
 const vtubers = new Map<string, VTuber>(data.map((vtuber: VTuber) => [vtuber.customUrl.slice(1), vtuber]));
 
 const CLIENT_ID = "505848729119621140";
+const USE_JP = browser.i18n.getUILanguage().startsWith("ja");
 
 let presence: RichPresenceProxy | null = null;
 let currentVideoId: string | null = null;
@@ -28,6 +29,7 @@ function updatePresence(activity: Activity) {
         presence.setActivity(activity);
     } catch {
         presence = null;
+        currentVideoId = null;
     }
 }
 
@@ -51,14 +53,14 @@ browser.runtime.onMessage.addListener((message: DocumentData) => {
     if (!message.channelUrl)
         return;
 
-    const channel = vtubers.get(message.channelUrl.split('@')[1]);
+    const channel = vtubers.get(message.channelUrl.split('@')[1].toLowerCase());
     if (!channel) {
         console.warn("Channel not found:", message.channelUrl);
         return;
     }
 
     if (currentVideoId === message.videoId) {
-        console.log("Ignoring duplicate video ID");
+        console.log("Ignoring duplicate video ID", currentVideoId);
         return;
     }
 
@@ -66,11 +68,21 @@ browser.runtime.onMessage.addListener((message: DocumentData) => {
     console.log("Updating presence with data:", message);
     updatePresence({
         type: ActivityType.WATCHING,
-        details: message.title ?? 'Unknown Title',
-        state: message.author ?? 'Unknown Author',
+        details: message.title ?? "",
+        state: message.author ?? "",
         assets: {
             large_image: channel.photo,
-            small_image: channel.org,
+            small_image: channel.org.toLowerCase(),
         },
+        buttons: [
+            {
+                label: USE_JP ? "YouTubeで視聴" : "Watch on YouTube",
+                url: `https://www.youtube.com/watch?v=${message.videoId}`,
+            },
+            {
+                label: USE_JP ? "チャンネルを訪問" : "Visit Channel",
+                url: message.channelUrl,
+            },
+        ],
     });
 });
