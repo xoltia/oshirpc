@@ -17,7 +17,7 @@ First, to build the required application from `native` run:
 zig build -Doptimize=ReleaseSafe # Outputs to ./zig-out/bin
 ```
 
-Now, move to the `extension` directory and run the follow:
+Now move to the `extension` directory and run the following:
 ```sh
 export YOUTUBE_API_KEY=XXXXXXXX
 export HOLODEX_API_KEY=XXXXXXXX
