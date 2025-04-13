@@ -6,15 +6,28 @@ const native_endian = builtin.cpu.arch.endian();
 const MAX_RECV = 1 << 26;
 const Self = @This();
 
-pipe: std.net.Stream,
+pipe: if (builtin.os.tag == .windows) std.fs.File else std.net.Stream,
 allocator: std.mem.Allocator,
 
 pub fn open(allocator: std.mem.Allocator, client_id: []const u8) !Self {
-    var path_iterator = try LinuxPath.init();
+    var path_iterator = switch (builtin.os.tag) {
+        .linux => try LinuxPath.init(),
+        .windows => WindowsPath{},
+        else => @compileError("Unsupported platform"),
+    };
+
     var ipc: Self = undefined;
     while (try path_iterator.next()) |path| {
-        if (std.net.connectUnixSocket(path)) |stream| {
-            ipc = .{ .pipe = stream, .allocator = allocator };
+        const maybe_pipe = if (builtin.os.tag == .windows)
+            std.fs.openFileAbsolute(path, .{ .mode = .read_write })
+        else
+            std.net.connectUnixSocket(path);
+
+        if (maybe_pipe) |stream| {
+            ipc = Self{
+                .pipe = stream,
+                .allocator = allocator,
+            };
             break;
         } else |err| {
             std.log.warn("Unable to open {s}: {?}", .{ path, err });
@@ -168,5 +181,27 @@ pub const LinuxPath = struct {
         const uid = std.os.linux.getuid();
         const slice = try std.fmt.allocPrint(allocator, "/run/user/{d}", .{uid});
         return slice.len;
+    }
+};
+
+// Windows implementation of IPC path.
+pub const WindowsPath = struct {
+    const path_fmt = "\\\\?\\pipe\\discord-ipc-{d}";
+
+    path_buffer: [std.fs.max_path_bytes]u8 = undefined,
+    index: usize = 0,
+
+    fn next(self: *WindowsPath) !?[]const u8 {
+        if (self.index == 10)
+            return null;
+
+        const subpath = try std.fmt.bufPrint(
+            &self.path_buffer,
+            path_fmt,
+            .{self.index},
+        );
+
+        self.index += 1;
+        return self.path_buffer[0..subpath.len];
     }
 };
