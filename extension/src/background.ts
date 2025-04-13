@@ -10,8 +10,8 @@ type VTuber = {
     org: string;
 };
 
-const vtubers = new Map<string, VTuber>(data.map((vtuber: VTuber) => [vtuber.customUrl.slice(1), vtuber]));
-
+// Map of either handle format (@vtuber) or ID format (UC...)
+const vtubers = data as VTuber[];
 const CLIENT_ID = "505848729119621140";
 const USE_JP = browser.i18n.getUILanguage().startsWith("ja");
 
@@ -53,14 +53,21 @@ browser.runtime.onMessage.addListener((message: DocumentData) => {
     if (!message.channelUrl)
         return;
 
-    const channel = vtubers.get(message.channelUrl.split('@')[1].toLowerCase());
-    if (!channel) {
-        console.warn("Channel not found:", message.channelUrl);
+    let handleOrId = message.channelUrl.split('/').pop();
+
+    if (!handleOrId) {
+        console.error("Channel URL is malformed:", message.channelUrl);
         return;
+    } else if (handleOrId.startsWith("@")) {
+        handleOrId = handleOrId.toLowerCase();
     }
 
-    if (currentVideoId === message.videoId) {
-        console.log("Ignoring duplicate video ID", currentVideoId);
+    const channel = vtubers.find((vtuber) => {
+        return vtuber.id === handleOrId || vtuber.customUrl === handleOrId;
+    });
+
+    if (!channel) {
+        console.error("Channel not found:", handleOrId);
         return;
     }
 
