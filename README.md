@@ -13,7 +13,7 @@ The build process requires:
 
 First, to build the required application from `native` run:
 ```sh
-zig build -Doptimize=ReleaseFast # Outputs to ./zig-out/bin
+zig build -Doptimize=ReleaseSafe # Outputs to ./zig-out/bin
 ```
 
 Now, move to the `extension` directory and run the follow:
