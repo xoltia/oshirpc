@@ -3,7 +3,8 @@
 Browser extension for displaying vtubers you are currently viewing using Discord rich presence.
 Currently supports Firefox for Windows and Linux.
 
-![Preview image](https://github.com/user-attachments/assets/42576508-e6e5-47dc-9880-981d8178467e)
+![preview image](https://github.com/user-attachments/assets/b85fd96a-27e1-492d-9247-a65c8f427f08)
+
 
 ## Building
 
