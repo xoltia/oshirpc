@@ -53,6 +53,11 @@ browser.runtime.onMessage.addListener((message: DocumentData) => {
     if (!message.channelUrl)
         return;
 
+    if (message.videoId === currentVideoId) {
+        console.log("Video ID is the same, skipping presence update");
+        return;
+    }
+
     let handleOrId = message.channelUrl.split('/').pop();
 
     if (!handleOrId) {
