@@ -5,3 +5,4 @@ dist
 .env
 vtubers.json
 youtube_channels.json
+data.json

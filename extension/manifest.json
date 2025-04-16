@@ -2,7 +2,7 @@
     "description": "Show your Discord friends which VTuber you're watching on YouTube.",
     "manifest_version": 3,
     "name": "OshiRPC",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "homepage_url": "https://github.com/xoltia/oshirpc",
     "icons": {},
     "content_scripts": [
@@ -15,6 +15,9 @@
             ]
         }
     ],
+    "options_ui": {
+        "page": "options.html"
+    },
     "browser_specific_settings": {
         "gecko": {
             "id": "oshirpc@xoltia.github.io"
@@ -36,6 +39,7 @@
         ]
     },
     "permissions": [
-        "nativeMessaging"
+        "nativeMessaging",
+        "storage"
     ]
 }
