@@ -19,11 +19,7 @@ zig build -Doptimize=ReleaseSafe # Outputs to ./zig-out/bin
 
 Now move to the `extension` directory and run the following:
 ```sh
-export YOUTUBE_API_KEY=XXXXXXXX
-export HOLODEX_API_KEY=XXXXXXXX
 bun install # Install dependencies
-bun run data_gen/index.ts # Pull data from holodex and youtube api
-bun run data_gen/join.ts # Create final data file
 bun run build # Build the extension, outputs to ./dist
 ```
 
