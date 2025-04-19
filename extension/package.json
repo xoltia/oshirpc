@@ -12,6 +12,7 @@
     "@types/firefox-webext-browser": "^120.0.4"
   },
   "scripts": {
-    "build": "bun build --outdir=dist --target=browser --format=esm src/content.ts src/background.ts src/contentLoader.ts src/options.ts && cp src/options.html manifest.json dist"
+    "bundle": "bun build --outdir=dist --target=browser --format=esm ./src/{content.ts,background.ts,contentLoader.ts,options.ts}",
+    "build": "bun run bundle && cp ./src/options.html ./manifest.json ./dist"
   }
 }
